@@ -1,0 +1,163 @@
+﻿@page "/productos"
+@rendermode InteractiveServer
+@using PruebaTecnica.Ui.Services
+@inject PruebaTecnica.Ui.Services.ProductosApiService Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<h3>Productos</h3>
+
+<div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <div>
+        <label>Código</label><br />
+        <input class="form-control" @bind="fCodigo" />
+    </div>
+    <div>
+        <label>Nombre</label><br />
+        <input class="form-control" @bind="fNombre" />
+    </div>
+    <div>
+        <label>Activo</label><br />
+        <select class="form-select" @bind="fActivo">
+            <option value="">(Todos)</option>
+            <option value="true">Activos</option>
+            <option value="false">Inactivos</option>
+        </select>
+    </div>
+
+    <button class="btn btn-primary" @onclick="Buscar">Buscar</button>
+    <button class="btn btn-secondary" @onclick="Limpiar">Limpiar</button>
+    <button class="btn btn-success" @onclick="CrearNuevo">+ Nuevo</button>
+</div>
+
+@if (cargando)
+{
+    <p>Cargando...</p>
+}
+else if (productos.Count == 0)
+{
+    <p>No hay productos.</p>
+}
+else
+{
+    <table class="table table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Precio</th>
+                <th>Stock</th>
+                <th>Activo</th>
+                <th style="width:240px;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in productos)
+            {
+                <tr>
+                    <td>@p.Id</td>
+                    <td>@p.Codigo</td>
+                    <td>@p.Nombre</td>
+                    <td>@p.Precio.ToString("C")</td>
+                    <td>@p.Stock</td>
+                    <td>
+                        <span class="badge @(p.Activo ? "bg-success" : "bg-secondary")">
+                            @(p.Activo ? "Activo" : "Inactivo")
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-info" @onclick="() => Ver(p.Id)">Detalle</button>
+                        <button class="btn btn-sm btn-warning ms-1" @onclick="() => Editar(p.Id)">Editar</button>
+                        <button class="btn btn-sm btn-danger ms-1" 
+                                @onclick="() => EliminarConConfirmacion(p.Id, p.Nombre)" 
+                                disabled="@(!p.Activo)">
+                            Eliminar
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="alert @(mensajeExito ? "alert-success" : "alert-warning") mt-2">@mensaje</div>
+}
+
+@code {
+    private List<ProductoDto> productos = new();
+    private bool cargando = true;
+
+    private string? fCodigo;
+    private string? fNombre;
+    private string? fActivo = "";
+
+    private string? mensaje;
+    private bool mensajeExito = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        cargando = true;
+        mensaje = null;
+
+        bool? activo = null;
+        if (fActivo == "true") activo = true;
+        if (fActivo == "false") activo = false;
+
+        productos = await Api.GetAllAsync(fCodigo, fNombre, activo);
+        cargando = false;
+    }
+
+    private async Task Buscar() => await Cargar();
+
+    private async Task Limpiar()
+    {
+        fCodigo = null;
+        fNombre = null;
+        fActivo = "";
+        await Cargar();
+    }
+
+    private void CrearNuevo() => Nav.NavigateTo("/productos/crear");
+    private void Ver(int id) => Nav.NavigateTo($"/productos/{id}");
+    private void Editar(int id) => Nav.NavigateTo($"/productos/editar/{id}");
+
+    private async Task EliminarConConfirmacion(int id, string nombre)
+    {
+        var confirmado = await JS.InvokeAsync<bool>("confirm", 
+            $"¿Está seguro de marcar como inactivo el producto '{nombre}'?\n\nEsta acción es un soft delete.");
+        
+        if (!confirmado)
+            return;
+
+        await Eliminar(id);
+    }
+
+    private async Task Eliminar(int id)
+    {
+        mensaje = null;
+        mensajeExito = false;
+
+        var ok = await Api.SoftDeleteAsync(id);
+        
+        if (ok)
+        {
+            mensaje = "Producto marcado como inactivo correctamente.";
+            mensajeExito = true;
+        }
+        else
+        {
+            mensaje = "No se pudo marcar como inactivo. Verifique la conexión con la API.";
+            mensajeExito = false;
+        }
+
+        await Cargar();
+    }
+}

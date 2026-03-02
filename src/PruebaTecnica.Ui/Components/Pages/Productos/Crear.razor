@@ -1,0 +1,64 @@
+﻿@page "/productos/crear"
+@rendermode InteractiveServer
+@using PruebaTecnica.Ui.Services
+@inject PruebaTecnica.Ui.Services.ProductosApiService Api
+@inject NavigationManager Nav
+
+<h3>Crear Producto</h3>
+
+<EditForm Model="model" OnValidSubmit="Guardar">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-2">
+        <label>Código</label>
+        <InputText class="form-control" @bind-Value="model.Codigo" />
+    </div>
+
+    <div class="mb-2">
+        <label>Nombre</label>
+        <InputText class="form-control" @bind-Value="model.Nombre" />
+    </div>
+
+    <div class="mb-2">
+        <label>Precio</label>
+        <InputNumber class="form-control" @bind-Value="model.Precio" />
+    </div>
+
+    <div class="mb-2">
+        <label>Stock</label>
+        <InputNumber class="form-control" @bind-Value="model.Stock" />
+    </div>
+
+    <button class="btn btn-success" type="submit" disabled="@guardando">Guardar</button>
+    <button class="btn btn-secondary ms-2" type="button" @onclick="Volver">Cancelar</button>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="alert alert-warning mt-2">@mensaje</div>
+}
+
+@code {
+    private ProductoCreateDto model = new();
+    private bool guardando;
+    private string? mensaje;
+
+    private async Task Guardar()
+    {
+        guardando = true;
+        mensaje = null;
+
+        var created = await Api.CreateAsync(model);
+        if (created is null)
+        {
+            mensaje = "No se pudo crear. Verifica que el código no esté repetido y que precio/stock sean válidos.";
+            guardando = false;
+            return;
+        }
+
+        Nav.NavigateTo("/productos");
+    }
+
+    private void Volver() => Nav.NavigateTo("/productos");
+}
